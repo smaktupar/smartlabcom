@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Labcom</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        /* Reset margin. overflow-y auto di body agar konten tidak terpotong di layar kecil / font besar */
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            font-family: sans-serif;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background-color: #f4f6f9;
+        }
+
+        /* Desain Layar Instalasi yang berada di tengah */
+        #install-screen { 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100%; 
+            text-align: center; 
+            padding: 20px; 
+            box-sizing: border-box;
+        }
+
+        /* --- CSS UNTUK LOADING SPINNER --- */
+        #loading-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 123, 255, 0.2);
+            border-left-color: #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+        }
+
+        /* --- CSS TOMBOL --- */
+        .btn {
+            padding: 12px 24px; 
+            font-size: 16px; 
+            font-weight: bold;
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 15px;
+            display: none; /* Disembunyikan default */
+        }
+        #installBtn { background-color: #28a745; }
+        #installBtn:active { background-color: #1e7e34; }
+        
+        #openAppBtn { background-color: #007bff; }
+        #openAppBtn:active { background-color: #0056b3; }
+
+        /* Container Aplikasi (Iframe) */
+        #app-content { 
+            display: none; 
+            width: 100%; 
+            height: 100%; 
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* Teks Status */
+        h2 { margin-bottom: 2px; margin-top: 10px; }
+        #info-text { font-size: 15px; line-height: 1.2;}
+        #dev-text { font-size: 12px; }
+        #status-text { margin-top: 15px; color: #333; font-size: 15px; line-height: 1.5; }   
+        .meta-text { margin: 0 0 5px; color: #333; line-height: 1.5; }
+        .highlight { font-weight: bold; color: #28a745; } 
+    </style>
+</head>
+<body>
+
+    <!-- LAYAR SAAT DIBUKA DI BROWSER -->
+    <div id="install-screen">
+        <img src="icon-192x192.png" alt="Logo" style="max-width: 120px; margin-bottom: 15px;">
+        <h2>Smart Labcom</h2>
+        <div id="info-text" class="meta-text">Manajemen Inventaris Digital</div>
+        <div id="dev-text" class="meta-text">(Developed by Labcom Productions)</div>
+        <div id="status-text">
+            <p>Aplikasi ini hanya dapat digunakan setelah diinstal ke perangkat Anda.</p>
+        </div>
+
+        <!-- Indikator Loading -->
+        <div id="loading-indicator">
+            <div class="spinner"></div>
+            <p style="color: gray; font-size: 14px;">Memeriksa status aplikasi...</p>
+        </div>
+
+        <!-- Tombol Instal & Buka -->
+        <button id="installBtn" class="btn">Instal Aplikasi</button>
+        <button id="openAppBtn" class="btn">Petunjuk Penggunaan</button>
+        <button id="closeBrowserBtn" class="btn" style="background-color: #dc3545;">Tutup Halaman Ini</button>
+
+        <p id="ios-note" style="display: none; color: gray; font-size: 13px; margin-top: 20px;">
+            Pengguna iOS: Tekan ikon "Share" di bawah, lalu pilih "Add to Home Screen".
+        </p>
+
+        <p id="unsupported-note" style="display: none; color: gray; font-size: 13px; margin-top: 20px;">
+            Browser Anda mungkin tidak mendukung instalasi otomatis. Untuk hasil terbaik, buka tautan ini menggunakan Chrome atau Edge.
+        </p>
+    </div>
+
+    <!-- LAYAR APLIKASI UTAMA (SETELAH DIINSTAL) -->
+    <div id="app-content">
+        <iframe src="https://script.google.com/macros/s/AKfycbxGaviAf8MJKyDCrKprjCQIMnuUYIoal_djgRbrAZB-6RoSxlyIU9nFK9Q29JYxTLa4/exec" allow="camera; microphone"></iframe>
+    </div>
+
+    <script>
+        // 1. Daftarkan Service Worker (dengan pengecekan protokol untuk menghindari error di Sandbox/Preview)
+        if ('serviceWorker' in navigator) {
+            if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => console.log('Service Worker Registered'))
+                    .catch((err) => console.warn('Pendaftaran Service Worker gagal (biasa terjadi di preview):', err));
+            } else {
+                console.warn('Pendaftaran Service Worker dilewati karena protokol tidak didukung:', window.location.protocol);
+            }
+        }
+
+        // Referensi Elemen DOM
+        const installScreen = document.getElementById('install-screen');
+        const appContent = document.getElementById('app-content');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const installBtn = document.getElementById('installBtn');
+        const openAppBtn = document.getElementById('openAppBtn');
+        const closeBrowserBtn = document.getElementById('closeBrowserBtn');
+        const statusText = document.getElementById('status-text');
+        const iosNote = document.getElementById('ios-note');
+        const unsupportedNote = document.getElementById('unsupported-note');
+
+        // Fungsi Deteksi iOS (termasuk iPadOS 13+, yang UA-nya menyamar sebagai Mac)
+        const isIos = () => {
+          const userAgent = window.navigator.userAgent.toLowerCase();
+          const isIphoneOrIpod = /iphone|ipod/.test(userAgent);
+          const isIpadUA = /ipad/.test(userAgent);
+          const isIpadOSDesktopUA = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+          return isIphoneOrIpod || isIpadUA || isIpadOSDesktopUA;
+        }
+
+        // Fungsi Deteksi dukungan event beforeinstallprompt (Chrome/Edge/Android WebView, dsb)
+        // Browser seperti Firefox dan Safari desktop tidak pernah memicu event ini,
+        // jadi ketiadaannya TIDAK selalu berarti "sudah terinstal".
+        const supportsInstallPrompt = () => {
+          const ua = window.navigator.userAgent.toLowerCase();
+          const isFirefox = /firefox/.test(ua);
+          const isSafariDesktop = /safari/.test(ua) && !/chrome|chromium|crios|edg/.test(ua) && !isIos();
+          return !(isFirefox || isSafariDesktop);
+        }
+
+        // 2. Cek apakah sudah dibuka dari aplikasi (Standalone)
+        function checkDisplayMode() {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+            if (isStandalone) {
+                installScreen.style.display = 'none';
+                appContent.style.display = 'block';
+                return true; // Berhenti di sini jika sudah mode aplikasi
+            }
+            return false;
+        }
+
+        // Jalankan logika hanya jika BUKAN mode aplikasi (berarti sedang buka di browser biasa)
+        if (!checkDisplayMode()) {
+            let promptFired = false;
+            let deferredPrompt;
+            let installTimeout;
+            let installedFallbackTimeout;
+
+            // Tangkap event sebelum instalasi muncul
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                promptFired = true;
+                deferredPrompt = e;
+
+                clearTimeout(installTimeout);
+
+                loadingIndicator.style.display = 'none';
+                installBtn.style.display = 'inline-block';
+                statusText.innerHTML = '<p>Aplikasi siap diinstal ke perangkat Anda.</p>';
+            });
+
+            // Logika Timeout: 5 detik menunggu beforeinstallprompt
+            installTimeout = setTimeout(() => {
+                if (!promptFired) {
+                    loadingIndicator.style.display = 'none';
+
+                    if (isIos()) {
+                        // Jika iOS, tampilkan panduan manual (event ini memang tidak ada di iOS)
+                        iosNote.style.display = 'block';
+                    } else if (!supportsInstallPrompt()) {
+                        // Browser yang memang tidak mendukung prompt instalasi otomatis
+                        statusText.innerHTML = '<p>Browser Anda tidak mendukung instalasi otomatis.</p>';
+                        unsupportedNote.style.display = 'block';
+                    } else {
+                        // Kemungkinan besar sudah terinstal, tapi ini asumsi, bukan kepastian
+                        statusText.innerHTML = '<p class="highlight">Aplikasi sepertinya sudah terinstal!</p><p style="font-size: 13px;">Jika belum, coba muat ulang halaman ini. Jika sudah, silakan tutup halaman browser ini dan buka dari layar beranda (Home Screen) Anda.</p>';
+                        openAppBtn.style.display = 'inline-block';
+                    }
+                }
+            }, 5000);
+
+            // Event Klik Tombol Instal
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                        openAppBtn.style.display = 'none';
+                        loadingIndicator.style.display = 'flex';
+                        loadingIndicator.querySelector('p').innerText = 'Sedang menginstal aplikasi...';
+                        statusText.innerHTML = '<p class="highlight" style="color: #007bff;">Sedang memproses instalasi...</p><p style="font-size: 13px;">Mohon tunggu sebentar hingga selesai.</p>';
+
+                        // Fallback: jika event 'appinstalled' tidak kunjung terpicu dalam 10 detik,
+                        // jangan biarkan user terjebak di layar loading selamanya.
+                        installedFallbackTimeout = setTimeout(() => {
+                            loadingIndicator.style.display = 'none';
+                            statusText.innerHTML = '<p class="highlight">Instalasi mungkin sudah selesai.</p><p style="font-size: 13px;">Silakan periksa Layar Beranda (Home Screen) HP Anda. Jika belum ada, coba ulangi proses instalasi.</p>';
+                            closeBrowserBtn.style.display = 'inline-block';
+                        }, 10000);
+                    } else {
+                        // Pengguna membatalkan / menolak prompt instalasi
+                        statusText.innerHTML = '<p>Instalasi dibatalkan.</p><p style="font-size: 13px;">Muat ulang halaman ini jika ingin mencoba menginstal lagi.</p>';
+                    }
+                    deferredPrompt = null;
+                }
+            });
+
+            // TANGKAP EVENT SAAT INSTALASI BENAR-BENAR SELESAI
+            window.addEventListener('appinstalled', () => {
+                clearTimeout(installedFallbackTimeout);
+                loadingIndicator.style.display = 'none';
+                statusText.innerHTML = '<p class="highlight">Aplikasi berhasil diinstal!</p><p style="font-size: 13px;">Silakan tutup halaman browser ini dan buka ikon aplikasi dari Layar Beranda (Home Screen) HP Anda.</p>';
+                closeBrowserBtn.style.display = 'inline-block';
+            });
+
+            // Event Klik Tombol Tutup Browser
+            closeBrowserBtn.addEventListener('click', () => {
+                window.close();
+                setTimeout(() => {
+                    alert("Silakan tutup tab/halaman browser ini secara manual (tekan tombol Back/Kembali pada HP Anda).");
+                }, 300);
+            });
+
+            // Event Klik Tombol Buka Aplikasi (Pemberitahuan)
+            openAppBtn.addEventListener('click', () => {
+                alert("Setelah aplikasi berhasil diinstal silakan kembali ke Menu Utama (Home Screen) HP Anda, cari ikon aplikasi dan buka dari sana.");
+            });
+        }
+    </script>
+</body>
+</html>
